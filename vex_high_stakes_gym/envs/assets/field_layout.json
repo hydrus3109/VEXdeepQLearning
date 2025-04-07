@@ -7,8 +7,8 @@
     "goals": [
       {
         "position": {
-          "x": 1,
-          "y": 5
+          "x": 25,
+          "y": 95.5
         },
         "size": {
           "width": 1,
@@ -18,8 +18,8 @@
       },
       {
         "position": {
-          "x": 11,
-          "y": 5
+          "x": 131,
+          "y": 95.5
         },
         "size": {
           "width": 1,
@@ -31,8 +31,8 @@
     "rings": [
       {
         "position": {
-          "x": 3,
-          "y": 3
+          "x": 13,
+          "y": 119
         },
         "size": {
           "radius": 0.5
@@ -41,13 +41,319 @@
       },
       {
         "position": {
-          "x": 9,
-          "y": 3
+          "x": 25,
+          "y": 119.5
         },
         "size": {
           "radius": 0.5
         },
         "points": 5
+      },
+      {
+        "position": {
+          "x": 25,
+          "y": 131
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 48.5,
+          "y": 119
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 48.5,
+          "y": 95.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 72,
+          "y": 131
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 95.5,
+          "y": 119
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 95.5,
+          "y": 95.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 119,
+          "y": 119
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 119,
+          "y": 131
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 131,
+          "y": 119.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 13,
+          "y": 25.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 25,
+          "y": 24.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 25,
+          "y": 13
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 48.5,
+          "y": 25.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 48.5,
+          "y": 49.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 72,
+          "y": 13
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 95.5,
+          "y": 25.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 95.5,
+          "y": 49.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 119,
+          "y": 25.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 119,
+          "y": 13
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 131,
+          "y": 25.5
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      },
+      {
+        "position": {
+          "x": 72,
+          "y": 72
+        },
+        "size": {
+          "radius": 0.5
+        },
+        "points": 5
+      }
+    ],
+    "mobile_goals": [
+      {
+        "position": {
+          "x": 25,
+          "y": 95.5
+        },
+        "size": {
+          "radius": 1.0
+        },
+        "scorable": true
+      },
+      {
+        "position": {
+          "x": 131,
+          "y": 95.5
+        },
+        "size": {
+          "radius": 1.0
+        },
+        "scorable": false
+      },
+      {
+        "position": {
+          "x": 25,
+          "y": 48.5
+        },
+        "size": {
+          "radius": 1.0
+        },
+        "scorable": true
+      },
+      {
+        "position": {
+          "x": 131,
+          "y": 48.5
+        },
+        "size": {
+          "radius": 1.0
+        },
+        "scorable": false
+      },
+      {
+        "position": {
+          "x": 119,
+          "y": 72
+        },
+        "size": {
+          "radius": 1.0
+        },
+        "scorable": true
+      }
+    ],
+    "borders": {
+      "left": {
+        "x": 0,
+        "y": 72
+      },
+      "right": {
+        "x": 144,
+        "y": 72
+      },
+      "top": {
+        "x": 72,
+        "y": 144
+      },
+      "bottom": {
+        "x": 72,
+        "y": 72
+      }
+    },
+    "corners": [
+      {
+        "position": {
+          "x": 138,
+          "y": 138
+        }
+      },
+      {
+        "position": {
+          "x": 138,
+          "y": 6
+        }
+      },
+      {
+        "position": {
+          "x": 6,
+          "y": 138
+        }
+      },
+      {
+        "position": {
+          "x": 6,
+          "y": 6
+        }
       }
     ]
   },
