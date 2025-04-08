@@ -89,6 +89,7 @@ def run_manual_simulation():
     # 6. Move to another corner
     print("\nStep 6: Moving to another corner")
     accessible_objects = env.get_accessible_objects()
+    #print(accessible_objects)
     corner_actions = [i for i, obj in enumerate(accessible_objects) if obj['type'] == 'corner']
     
     if corner_actions:

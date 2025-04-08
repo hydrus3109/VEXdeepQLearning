@@ -1,9 +1,19 @@
 import gym
 import numpy as np
+import numpy
 import matplotlib.pyplot as plt
 import json
 import os
 import math
+# Add required imports for DQNAgent
+from collections import deque
+import random
+import tensorflow as tf
+from tensorflow.python import keras
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense
+#from tensorflow.python.keras.optimizers import Adam
+
 class HighStakesEnv(gym.Env):
     def __init__(self):
         super(HighStakesEnv, self).__init__()
@@ -23,7 +33,7 @@ class HighStakesEnv(gym.Env):
             low=-float('inf'), 
             high=float('inf'), 
             shape=(obs_size,), 
-            dtype=np.float32
+            dtype=numpy.float32
         )
         
         self.score = 0
@@ -58,6 +68,9 @@ class HighStakesEnv(gym.Env):
             }
         
         # Initialize state based on the loaded/default configuration
+        field_width = self.field_config['field']['dimensions']['width']
+        field_height = self.field_config['field']['dimensions']['height']
+        
         self.state = {
             # Robot starts at bottom left by default
             'robot': {
@@ -82,16 +95,23 @@ class HighStakesEnv(gym.Env):
                     'scorable': goal['scorable'],
                     'size' :[2*goal['size']['radius'], 2*goal['size']['radius']],
                     'rings_scored': 0,
-                    # Assume goals at the edges are fixed, others are mobile
-                    'is_held' : False,
-                    'is_mobile': True
+                    'is_held': False,
+                    'is_mobile': True,
+                    'in_corner': False  # Track if goal is in a corner
                 } for goal in self.field_config['field']['mobile_goals']
             ],
             # Field dimensions
             'field': {
-                'width': self.field_config['field']['dimensions']['width'],
-                'height': self.field_config['field']['dimensions']['height']
-            }
+                'width': field_width,
+                'height': field_height
+            },
+            # Add corners to the state
+            'corners': [
+                {'position': [0, 0], 'has_goal': False, 'goal_index': -1},
+                {'position': [0, field_height], 'has_goal': False, 'goal_index': -1},
+                {'position': [field_width, 0], 'has_goal': False, 'goal_index': -1},
+                {'position': [field_width, field_height], 'has_goal': False, 'goal_index': -1}
+            ]
         }
 
     def reset(self):
@@ -108,7 +128,6 @@ class HighStakesEnv(gym.Env):
         
         # Get list of accessible objects
         accessible_objects = self.get_accessible_objects()
-        print(accessible_objects)
         # Check if action index is valid
         if action < 0 or action >= len(accessible_objects):
             reward -= 10  # Invalid action penalty
@@ -140,10 +159,14 @@ class HighStakesEnv(gym.Env):
             if target_obj['type'] == 'goal':
                 # Mobile goal interaction
                 if not self.state['robot']['holding_goal']:
-                    self.state['robot']['holding_goal'] = True
-                    self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
-                    self.state['goals'][target_obj['index']]['is_held'] = True
-                    reward += 10  # Reward for acquiring mobile goal
+                    # Only allow picking up a goal if it's not in a corner
+                    if not self.state['goals'][target_obj['index']]['in_corner']:
+                        self.state['robot']['holding_goal'] = True
+                        self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
+                        self.state['goals'][target_obj['index']]['is_held'] = True
+                        reward += 10  # Reward for acquiring mobile goal
+                    else:
+                        reward -= 5  # Penalty for trying to pick up a goal in a corner
                 else:
                     reward -= 10  # Penalty for trying to grab another goal
                     
@@ -170,7 +193,21 @@ class HighStakesEnv(gym.Env):
             elif target_obj['type'] == 'corner':
                 # Corner interaction
                 if self.state['robot']['holding_goal']:
+                    corner_index = target_obj['index']
+                    goal_index = self.get_held_goal_index()
+                    
+                    # Place goal in corner
                     self.state['robot']['holding_goal'] = False
+                    self.state['corners'][corner_index]['has_goal'] = True
+                    self.state['corners'][corner_index]['goal_index'] = goal_index
+                    
+                    # Update goal position and state
+                    goal = self.state['goals'][goal_index]
+                    goal['position'] = list(self.state['corners'][corner_index]['position'])
+                    goal['is_mobile'] = False
+                    goal['is_held'] = False
+                    goal['in_corner'] = True  # Mark as in a corner
+                    
                     reward += 5  # Score for placing goal in corner
                 else:
                     reward -= 1  # No goal to place
@@ -193,15 +230,13 @@ class HighStakesEnv(gym.Env):
     def render(self, mode='human'):
         """
         Render the current state of the High Stakes environment.
-        
-        Args:
-            mode (str): 'human' for display on screen, 'rgb_array' for numpy array
         """
-        #print("Rendering")
-        import matplotlib.pyplot as plt 
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
+        from matplotlib.transforms import Affine2D
+        import numpy as np
+        
         if not hasattr(self, 'fig'):
-            # Initialize the visualization on first render call
-            import matplotlib.pyplot as plt
             self.fig, self.ax = plt.subplots(figsize=(6, 6))
             plt.ion()  # Interactive mode
         
@@ -215,36 +250,80 @@ class HighStakesEnv(gym.Env):
         self.ax.grid(True)
         self.ax.set_aspect('equal')
         
+        # Draw field boundary
+        self.ax.add_patch(plt.Rectangle((0, 0), field_width, field_height, 
+                                      fill=False, edgecolor='black', linewidth=2))
+        
         # Draw game elements based on state
-        # This will need customization based on your actual state structure
         if hasattr(self, 'state'):
-            #print("state", self.state)
-            # Example: Draw robot position
+            # Draw robot position with correct orientation
             if 'robot' in self.state:
                 x, y = self.state['robot']['position']
-                orientation = self.state['robot']['orientation']
-                self.ax.add_patch(plt.Rectangle((x-8, y-8), 16, 16, angle = orientation, color='green'))
-                print('bot')
+                orientation_rad = self.state['robot']['orientation']
+                
+                # Use transform to properly rotate rectangle around its center
+                robot_size = 16
+                
+                # Create a rectangle centered at origin (0,0)
+                rect = Rectangle((-robot_size/2, -robot_size/2), robot_size, robot_size, 
+                                color='green', alpha=0.7)
+                
+                # Create transformation: first rotate around origin, then translate to (x,y)
+                t = Affine2D().rotate(orientation_rad).translate(x, y)
+                rect.set_transform(t + self.ax.transData)
+                self.ax.add_patch(rect)
+                
+                # Draw direction indicator
+                arrow_length = robot_size * 0.75
+                dir_x = x + np.cos(orientation_rad) * arrow_length
+                dir_y = y + np.sin(orientation_rad) * arrow_length
+                self.ax.plot([x, dir_x], [y, dir_y], color='black', linewidth=3)
+                self.ax.plot([dir_x], [dir_y], 'o', color='black', markersize=6)
+                
+                # Show if robot is holding a goal
+                if self.state['robot']['holding_goal']:
+                    self.ax.text(x, y, "Has Goal", ha='center', va='center', 
+                               color='white', fontsize=8, weight='bold', zorder=10)
             
-            # Example: Draw rings
+            # Draw rings (only uncollected ones)
             if 'rings' in self.state:
                 for ring in self.state['rings']:
-                    x, y = ring['position']
-                    if(not ring['collected']):
-                        self.ax.add_patch(plt.Circle((x, y), 3.5, color='red'))
-                    #print("ring", x, y)
+                    if not ring['collected']:
+                        x, y = ring['position']
+                        self.ax.add_patch(plt.Circle((x, y), 3.5, color='red', alpha=0.8))
             
-            # Example: Draw goals
+            # Draw regular goals (not held by robot and not in corners)
             if 'goals' in self.state:
-                for goal in self.state['goals']:
-                    x, y = goal['position']
-                    if(not goal['is_mobile'] or goal['is_held']):
-                        continue
-                    self.ax.add_patch(plt.Rectangle((x-1.25, y-1.25), 2.5, 2.5, color='blue', fill=False))
-                    #print("goal", x, y)
+                for i, goal in enumerate(self.state['goals']):
+                    if not goal['is_held'] and not goal['in_corner']:
+                        x, y = goal['position']
+                        self.ax.add_patch(plt.Rectangle((x-5, y-5), 10, 10, color='blue', alpha=0.6))
+                        self.ax.text(x, y, f"Goal {i}", ha='center', va='center', 
+                                   fontsize=8, color='white', weight='bold')
+                        if goal['rings_scored'] > 0:
+                            self.ax.text(x, y-3, f"{goal['rings_scored']} rings", 
+                                       ha='center', va='center', fontsize=7, color='white')
+            
+            # Draw corners and goals in corners
+            if 'corners' in self.state:
+                for i, corner in enumerate(self.state['corners']):
+                    cx, cy = corner['position']
+                    
+                    # If a goal is in this corner, draw it
+                    if corner['has_goal'] and corner['goal_index'] >= 0:
+                        goal = self.state['goals'][corner['goal_index']]
+                        self.ax.add_patch(plt.Rectangle((cx, cy), 12, 12, 
+                                                      color='purple', alpha=0.7))
+                        # Show rings scored
+                        if goal['rings_scored'] > 0:
+                            self.ax.text(cx, cy, f"{goal['rings_scored']} rings", 
+                                       ha='center', va='center', fontsize=8, 
+                                       color='black', weight='bold')
         
         # Add title with score and time
-        self.ax.set_title(f'Score: {self.score}, Time: {self.current_time}/{self.time_limit}')
+        self.ax.set_title(f'Score: {self.score:.1f}, Time: {self.current_time}/{self.time_limit}')
+        
+    
         
         self.fig.canvas.draw()
         
@@ -254,8 +333,7 @@ class HighStakesEnv(gym.Env):
             return None
         elif mode == 'rgb_array':
             # Convert canvas to RGB array
-            import numpy as np
-            data = np.frombuffer(self.fig.canvas.tostring_rgb(), dtype=np.uint8)
+            data = numpy.frombuffer(self.fig.canvas.tostring_rgb(), dtype=numpy.uint8)
             data = data.reshape(self.fig.canvas.get_width_height()[::-1] + (3,))
             return data
         else:
@@ -268,8 +346,8 @@ class HighStakesEnv(gym.Env):
     def check_collision(self, start_pos, end_pos, width=2.5):
         """Check if a straight line path between two points collides with any objects"""
         # Vector from start to end
-        vec = np.array([end_pos[0] - start_pos[0], end_pos[1] - start_pos[1]])
-        vec_length = np.linalg.norm(vec)
+        vec = numpy.array([end_pos[0] - start_pos[0], end_pos[1] - start_pos[1]])
+        vec_length = numpy.linalg.norm(vec)
         if vec_length == 0:
             return False
             
@@ -311,24 +389,24 @@ class HighStakesEnv(gym.Env):
         # Check collision with each object
         for obj in all_objects:
             # Skip the start and end objects
-            if (np.allclose(start_pos, obj['position']) or 
-                np.allclose(end_pos, obj['position'])):
+            if (numpy.allclose(start_pos, obj['position']) or 
+                numpy.allclose(end_pos, obj['position'])):
                 continue
                 
             # Compute closest point on line to object
-            obj_pos = np.array(obj['position'])
-            start_to_obj = obj_pos - np.array(start_pos)
-            projection = np.dot(start_to_obj, vec)
+            obj_pos = numpy.array(obj['position'])
+            start_to_obj = obj_pos - numpy.array(start_pos)
+            projection = numpy.dot(start_to_obj, vec)
             
             # If projection is outside line segment, no collision
             if projection < 0 or projection > vec_length:
                 continue
                 
             # Closest point on line
-            closest_point = np.array(start_pos) + projection * vec
+            closest_point = numpy.array(start_pos) + projection * vec
             
             # Distance from closest point to object center
-            distance = np.linalg.norm(closest_point - obj_pos)
+            distance = numpy.linalg.norm(closest_point - obj_pos)
             
             # Check if distance is less than sum of object radius and path width
             if distance < (obj['radius'] + width/2):
@@ -370,9 +448,9 @@ class HighStakesEnv(gym.Env):
                     'type': 'ring'
                 })
         
-        # Check goals
+        # Check goals - don't include goals in corners or being held
         for i, goal in enumerate(self.state['goals']):
-            if not self.check_collision(robot_pos, goal['position']):
+            if not goal['in_corner'] and not goal['is_held'] and not self.check_collision(robot_pos, goal['position']):
                 accessible_objects.append({
                     'index': i,
                     'position': goal['position'],
@@ -380,18 +458,14 @@ class HighStakesEnv(gym.Env):
                 })
         
         # Add corners
-        field_width = self.state['field']['width']
-        field_height = self.state['field']['height']
-        corners = [
-            {'position': [0, 0], 'type': 'corner', 'index': 0},
-            {'position': [field_width, 0], 'type': 'corner', 'index': 1},
-            {'position': [0, field_height], 'type': 'corner', 'index': 2},
-            {'position': [field_width, field_height], 'type': 'corner', 'index': 3}
-        ]
-        
-        for corner in corners:
-            if not self.check_collision(robot_pos, corner['position']):
-                accessible_objects.append(corner)
+        for i, corner in enumerate(self.state['corners']):
+            #print(corner['position'], corner['has_goal'])
+            if not self.check_collision(robot_pos, corner['position']) and not corner['has_goal']:
+                accessible_objects.append({
+                    'position': corner['position'],
+                    'type': 'corner',
+                    'index': i
+                })
         
         return accessible_objects
     
@@ -421,7 +495,7 @@ class HighStakesEnv(gym.Env):
                 1.0 if goal['is_mobile'] else 0.0
             ])
             
-        return np.array(obs, dtype=np.float32)
+        return numpy.array(obs, dtype=numpy.float32)
     
     def get_held_goal_index(self):
         """Find the index of the goal being held by the robot"""
@@ -449,7 +523,7 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))
+        model.compile(loss='mse', optimizer= 'adam', metrics=['accuracy'])
         return model
         
     def remember(self, state, action, reward, next_state, done):
@@ -458,7 +532,7 @@ class DQNAgent:
         
     def act(self, state, accessible_objects_count):
         """Select action based on epsilon-greedy policy"""
-        if np.random.rand() <= self.epsilon:
+        if random.random() <= self.epsilon:
             return random.randrange(accessible_objects_count)
         act_values = self.model.predict(state.reshape(1, -1), verbose=0)
         return np.argmax(act_values[0][:accessible_objects_count])
@@ -472,12 +546,12 @@ class DQNAgent:
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                # Get max Q value for next state
-                next_accessible_count = int(next_state[-1])  # Last value stores accessible object count
-                if next_accessible_count > 0:
-                    target += self.gamma * np.amax(
-                        self.model.predict(next_state.reshape(1, -1), verbose=0)[0][:next_accessible_count]
-                    )
+                # Get next state prediction and max Q value for it
+                print(next_state.shape)
+                print(next_state.reshape(1, -1).shape)
+                print(next_state)
+                next_state_pred = self.model.predict(next_state.reshape(1, -1), verbose=0)[0]
+                target += self.gamma * np.amax(next_state_pred)
             
             # Get current Q values and update the target for action
             target_f = self.model.predict(state.reshape(1, -1), verbose=0)
@@ -492,29 +566,46 @@ class DQNAgent:
 
 # Training code
 def train_dqn_agent(env, episodes=1000):
+    """
+    Train a DQN agent on the High Stakes environment
+    
+    Args:
+        env: The environment instance
+        episodes: Number of episodes to train for
+        
+    Returns:
+        agent: Trained DQN agent
+        scores: List of scores for each episode
+    """
     # Get initial state to determine observation size
     state = env.reset()
-    accessible_objects = env.get_accessible_objects()
+    obs = env.get_observation()
+    state_size = len(obs)
     
     # Maximum possible actions (worst case - all objects accessible)
     max_actions = len(env.state['rings']) + len(env.state['goals']) + 4  # Rings + goals + 4 corners
     
     # Create agent with observation size and max action size
-    agent = DQNAgent(len(env.get_observation()), max_actions)
+    agent = DQNAgent(state_size, max_actions)
     
     # Training loop
     batch_size = 32
     scores = []
     
     for e in range(episodes):
-        state = env.reset()
+        # Reset environment for new episode
+        env.reset()
         state = env.get_observation()
         total_reward = 0
+        done = False
         
-        for time in range(env.time_limit):
+        # Episode loop
+        while not done:
             # Get accessible objects
             accessible_objects = env.get_accessible_objects()
-            
+            if len(accessible_objects) == 0:
+                break
+                
             # Choose action
             action = agent.act(state, len(accessible_objects))
             
@@ -522,23 +613,23 @@ def train_dqn_agent(env, episodes=1000):
             next_state, reward, done, _ = env.step(action)
             next_state = env.get_observation()
             
-            # Store experience
+            # Remember experience
             agent.remember(state, action, reward, next_state, done)
             
             # Update state and score
             state = next_state
             total_reward += reward
             
-            if done:
-                break
-                
-        # Train the agent
+            # Visualize training (optional, can be commented out for faster training)
+            # env.render()
+            
+        # Train the agent after episode completion
         agent.replay(batch_size)
         
         # Track progress
         scores.append(total_reward)
         
         if e % 10 == 0:
-            print(f"Episode: {e}/{episodes}, Score: {total_reward}, Epsilon: {agent.epsilon:.2f}")
+            print(f"Episode: {e}/{episodes}, Score: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
     
     return agent, scores
