@@ -164,11 +164,11 @@ class HighStakesEnv(gym.Env):
                         self.state['robot']['holding_goal'] = True
                         self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
                         self.state['goals'][target_obj['index']]['is_held'] = True
-                        reward += 10  # Reward for acquiring mobile goal
+                        reward += 5  # Reward for acquiring mobile goal
                     else:
                         reward -= 5  # Penalty for trying to pick up a goal in a corner
                 else:
-                    reward -= 10  # Penalty for trying to grab another goal
+                    reward -= 5  # Penalty for trying to grab another goal
                     
             elif target_obj['type'] == 'ring':
                 # Ring interaction
@@ -182,13 +182,13 @@ class HighStakesEnv(gym.Env):
                         goal['rings_scored'] += 1
                         
                         if ring_count == 0:
-                            reward += 3  # First ring bonus
+                            reward += 5  # First ring bonus
                         else:
-                            reward += 1  # Regular ring score
+                            reward += 3  # Regular ring score
                     else:
                         reward -= 1  # Penalty for full goal
                 else:
-                    reward -= 5  # No goal clamped
+                    reward -= 0.5  # No goal clamped
                     
             elif target_obj['type'] == 'corner':
                 # Corner interaction
@@ -208,7 +208,7 @@ class HighStakesEnv(gym.Env):
                     goal['is_held'] = False
                     goal['in_corner'] = True  # Mark as in a corner
                     
-                    reward += 5  # Score for placing goal in corner
+                    reward += 8  # Score for placing goal in corner
                 else:
                     reward -= 1  # No goal to place
             
@@ -504,7 +504,7 @@ class HighStakesEnv(gym.Env):
                 return i
         return -1  # Not holding any goal
 
-# Deep Q-Learning Agent
+# Update DQNAgent implementation to be more version compatible
 class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
@@ -518,12 +518,20 @@ class DQNAgent:
         self.model = self._build_model()
         
     def _build_model(self):
-        """Neural network for deep Q learning"""
-        model = Sequential()
-        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(24, activation='relu'))
-        model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer= 'adam', metrics=['accuracy'])
+        """Build a neural network model that predicts Q values for each action"""
+        # Use direct imports to avoid module attribute errors
+        import tensorflow as tf
+        
+        model = tf.keras.Sequential([
+            tf.keras.layers.Dense(24, input_dim=self.state_size, activation='relu'),
+            tf.keras.layers.Dense(24, activation='relu'),
+            tf.keras.layers.Dense(self.action_size, activation='linear')
+        ])
+        
+        model.compile(
+            loss='mse',
+            optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+        )
         return model
         
     def remember(self, state, action, reward, next_state, done):
@@ -532,35 +540,46 @@ class DQNAgent:
         
     def act(self, state, accessible_objects_count):
         """Select action based on epsilon-greedy policy"""
-        if random.random() <= self.epsilon:
+        if np.random.random() <= self.epsilon:
             return random.randrange(accessible_objects_count)
-        act_values = self.model.predict(state.reshape(1, -1), verbose=0)
-        return np.argmax(act_values[0][:accessible_objects_count])
+            
+        # Reshape state for prediction
+        state_tensor = np.array(state).reshape(1, -1).astype(np.float32)
+        act_values = self.model.predict(state_tensor, verbose=0)
+        
+        # Select best action among accessible ones
+        valid_actions = act_values[0][:accessible_objects_count]
+        return np.argmax(valid_actions)
         
     def replay(self, batch_size):
-        """Train on batches of experiences"""
+        """Train model on batches of experiences"""
         if len(self.memory) < batch_size:
             return
             
+        # Sample random experiences from memory
         minibatch = random.sample(self.memory, batch_size)
+        
         for state, action, reward, next_state, done in minibatch:
+            # Prepare state arrays for prediction
+            state_array = np.array(state).reshape(1, -1).astype(np.float32)
+            next_state_array = np.array(next_state).reshape(1, -1).astype(np.float32)
+            
+            # Initialize target with the reward
             target = reward
+            
             if not done:
-                # Get next state prediction and max Q value for it
-                print(next_state.shape)
-                print(next_state.reshape(1, -1).shape)
-                print(next_state)
-                next_state_pred = self.model.predict(next_state.reshape(1, -1), verbose=0)[0]
-                target += self.gamma * np.amax(next_state_pred)
+                # Predict future Q values and add discounted max Q value
+                next_q_values = self.model.predict(next_state_array, verbose=0)[0]
+                target += self.gamma * np.max(next_q_values)
             
-            # Get current Q values and update the target for action
-            target_f = self.model.predict(state.reshape(1, -1), verbose=0)
-            target_f[0][action] = target
+            # Get current Q values and update target for selected action
+            current_q_values = self.model.predict(state_array, verbose=0)
+            current_q_values[0][action] = target
             
-            # Train the network
-            self.model.fit(state.reshape(1, -1), target_f, epochs=1, verbose=0)
-            
-        # Decay epsilon
+            # Train model with updated Q values
+            self.model.fit(state_array, current_q_values, epochs=1, verbose=0)
+        
+        # Decay exploration rate
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -631,5 +650,6 @@ def train_dqn_agent(env, episodes=1000):
         
         if e % 10 == 0:
             print(f"Episode: {e}/{episodes}, Score: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
+            print()
     
     return agent, scores

@@ -8,6 +8,17 @@ def train_and_evaluate():
     # Create environment
     env = HighStakesEnv()
     
+    # Set up TensorFlow for better compatibility
+    import tensorflow as tf
+    import os
+    
+    # Suppress TensorFlow warnings
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    tf.get_logger().setLevel('ERROR')
+    
+    # Choose CPU over GPU for simplicity
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU
+    
     # Train the agent
     print("Starting training...")
     agent, scores = train_dqn_agent(env, episodes=100)  # Adjust episodes as needed
