@@ -12,6 +12,7 @@ def run_manual_simulation():
     
     # Total reward tracking
     total_reward = 0
+    total_score = 0
     
     # Display initial state
     print("Initial State")
@@ -24,13 +25,15 @@ def run_manual_simulation():
     # 1. Move to a goal
     print("\nStep 1: Moving to grab a mobile goal")
     accessible_objects = env.get_accessible_objects()
+    print(accessible_objects)
     goal_actions = [i for i, obj in enumerate(accessible_objects) if obj['type'] == 'goal']
     
     if goal_actions:
         action = goal_actions[0]  # First accessible goal
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _, score = env.step(action)
         total_reward += reward
-        print(f"Moved to goal, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     
@@ -41,9 +44,10 @@ def run_manual_simulation():
     
     if ring_actions:
         action = ring_actions[0]  # First accessible ring
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _, score = env.step(action)
         total_reward += reward
-        print(f"Collected ring, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     
@@ -54,9 +58,10 @@ def run_manual_simulation():
     
     if len(ring_actions) > 0:
         action = ring_actions[0]  # Another accessible ring
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _,score = env.step(action)
         total_reward += reward
-        print(f"Collected another ring, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     
@@ -67,9 +72,10 @@ def run_manual_simulation():
     
     if corner_actions:
         action = corner_actions[0]  # First accessible corner
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _, score = env.step(action)
         total_reward += reward
-        print(f"Placed goal in corner, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     
@@ -80,9 +86,10 @@ def run_manual_simulation():
     
     if goal_actions:
         action = goal_actions[0]  # Another accessible goal
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _, score = env.step(action)
         total_reward += reward
-        print(f"Grabbed another goal, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     
@@ -94,9 +101,10 @@ def run_manual_simulation():
     
     if corner_actions:
         action = corner_actions[0]  # Another accessible corner
-        obs, reward, done, _ = env.step(action)
+        obs, reward, done, _, score = env.step(action)
         total_reward += reward
-        print(f"Placed goal in another corner, reward: {reward}")
+        total_score += score
+        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
         env.render()
         time.sleep(1)
     

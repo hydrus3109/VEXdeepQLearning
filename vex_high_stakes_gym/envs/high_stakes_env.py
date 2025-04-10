@@ -125,9 +125,10 @@ class HighStakesEnv(gym.Env):
         reward = 0
         done = False
         info = {}
+        score = 0
         
         # Get list of accessible objects
-        accessible_objects = self.get_accessible_objects()
+        accessible_objects = self.get_accessible_objects()  # TODO: check this function
         # Check if action index is valid
         if action < 0 or action >= len(accessible_objects):
             reward -= 10  # Invalid action penalty
@@ -183,8 +184,10 @@ class HighStakesEnv(gym.Env):
                         
                         if ring_count == 0:
                             reward += 5  # First ring bonus
+                            score += 3
                         else:
                             reward += 3  # Regular ring score
+                            score += 1
                     else:
                         reward -= 1  # Penalty for full goal
                 else:
@@ -209,6 +212,7 @@ class HighStakesEnv(gym.Env):
                     goal['in_corner'] = True  # Mark as in a corner
                     
                     reward += 8  # Score for placing goal in corner
+                    score += 5
                 else:
                     reward -= 1  # No goal to place
             
@@ -225,7 +229,7 @@ class HighStakesEnv(gym.Env):
         # Update observation
         observation = self.get_observation()
         
-        return observation, reward, done, info
+        return observation, reward, done, info, score
     
     def render(self, mode='human'):
         """
@@ -343,7 +347,7 @@ class HighStakesEnv(gym.Env):
         # Clean up resources if needed
         pass
     
-    def check_collision(self, start_pos, end_pos, width=2.5):
+    def check_collision(self, start_pos, end_pos, width=16):
         """Check if a straight line path between two points collides with any objects"""
         # Vector from start to end
         vec = numpy.array([end_pos[0] - start_pos[0], end_pos[1] - start_pos[1]])
@@ -616,6 +620,7 @@ def train_dqn_agent(env, episodes=1000):
         env.reset()
         state = env.get_observation()
         total_reward = 0
+        total_score = 0
         done = False
         
         # Episode loop
@@ -629,7 +634,7 @@ def train_dqn_agent(env, episodes=1000):
             action = agent.act(state, len(accessible_objects))
             
             # Take action
-            next_state, reward, done, _ = env.step(action)
+            next_state, reward, done, _, score = env.step(action)
             next_state = env.get_observation()
             
             # Remember experience
@@ -638,6 +643,7 @@ def train_dqn_agent(env, episodes=1000):
             # Update state and score
             state = next_state
             total_reward += reward
+            total_score += score
             
             # Visualize training (optional, can be commented out for faster training)
             # env.render()
@@ -649,7 +655,7 @@ def train_dqn_agent(env, episodes=1000):
         scores.append(total_reward)
         
         if e % 10 == 0:
-            print(f"Episode: {e}/{episodes}, Score: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
+            print(f"Episode: {e}/{episodes}, Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}, Score: {total_score}")
             print()
     
     return agent, scores
