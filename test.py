@@ -33,7 +33,7 @@ def run_manual_simulation():
         obs, reward, done, _, score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     
@@ -47,7 +47,7 @@ def run_manual_simulation():
         obs, reward, done, _, score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     
@@ -61,7 +61,7 @@ def run_manual_simulation():
         obs, reward, done, _,score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     
@@ -75,7 +75,7 @@ def run_manual_simulation():
         obs, reward, done, _, score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     
@@ -89,7 +89,7 @@ def run_manual_simulation():
         obs, reward, done, _, score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     
@@ -104,7 +104,7 @@ def run_manual_simulation():
         obs, reward, done, _, score = env.step(action)
         total_reward += reward
         total_score += score
-        print(f"Moved to goal, reward: {reward}, Score: {total_score:.2f}")
+        print(f"Moved to goal, reward: {reward}, Score: {total_score}")
         env.render()
         time.sleep(1)
     

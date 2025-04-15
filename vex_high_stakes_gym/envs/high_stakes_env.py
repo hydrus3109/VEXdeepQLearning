@@ -107,10 +107,10 @@ class HighStakesEnv(gym.Env):
             },
             # Add corners to the state
             'corners': [
-                {'position': [0, 0], 'has_goal': False, 'goal_index': -1},
-                {'position': [0, field_height], 'has_goal': False, 'goal_index': -1},
-                {'position': [field_width, 0], 'has_goal': False, 'goal_index': -1},
-                {'position': [field_width, field_height], 'has_goal': False, 'goal_index': -1}
+                {'position': [138, 138], 'has_goal': False, 'goal_index': 1},
+                {'position': [6, 138], 'has_goal': False, 'goal_index': 2},
+                {'position': [138, 6], 'has_goal': False, 'goal_index': 3},
+                {'position': [6, 6], 'has_goal': False, 'goal_index': -1}
             ]
         }
 
@@ -129,92 +129,91 @@ class HighStakesEnv(gym.Env):
         
         # Get list of accessible objects
         accessible_objects = self.get_accessible_objects()  # TODO: check this function
-        # Check if action index is valid
-        if action < 0 or action >= len(accessible_objects):
-            reward -= 10  # Invalid action penalty
-        else:
-            # Get target object
-            target_obj = accessible_objects[action]
-            
-            # Estimate movement time
-            movement_time = self.estimate_movement_time(
-                self.state['robot']['position'], 
-                self.state['robot']['orientation'],
-                target_obj['position']
-            )
-            
-            # Apply time penalty (0.05 points per second)
-            time_penalty = movement_time * 0.05
-            reward -= time_penalty
-            
-            # Update robot position and orientation
-            target_vector = [
-                target_obj['position'][0] - self.state['robot']['position'][0],
-                target_obj['position'][1] - self.state['robot']['position'][1]
-            ]
-            target_angle = math.atan2(target_vector[1], target_vector[0])
-            self.state['robot']['position'] = target_obj['position']
-            self.state['robot']['orientation'] = target_angle
-            
-            # Handle interaction based on target object type
-            if target_obj['type'] == 'goal':
-                # Mobile goal interaction
-                if not self.state['robot']['holding_goal']:
-                    # Only allow picking up a goal if it's not in a corner
-                    if not self.state['goals'][target_obj['index']]['in_corner']:
-                        self.state['robot']['holding_goal'] = True
-                        self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
-                        self.state['goals'][target_obj['index']]['is_held'] = True
-                        reward += 5  # Reward for acquiring mobile goal
+        # Check if action index is vali
+        target_obj = accessible_objects[0]
+        for obj in accessible_objects:
+            if obj['index'] == action:
+                target_obj = obj
+        
+        # Estimate movement time
+        movement_time = self.estimate_movement_time(
+            self.state['robot']['position'], 
+            self.state['robot']['orientation'],
+            target_obj['position']
+        )
+        
+        # Apply time penalty (0.05 points per second)
+        time_penalty = movement_time * 0.05
+        reward -= time_penalty
+        
+        # Update robot position and orientation
+        target_vector = [
+            target_obj['position'][0] - self.state['robot']['position'][0],
+            target_obj['position'][1] - self.state['robot']['position'][1]
+        ]
+        target_angle = math.atan2(target_vector[1], target_vector[0])
+        self.state['robot']['position'] = target_obj['position']
+        self.state['robot']['orientation'] = target_angle
+        
+        # Handle interaction based on target object type
+        if target_obj['type'] == 'goal':
+            # Mobile goal interaction
+            if not self.state['robot']['holding_goal']:
+                # Only allow picking up a goal if it's not in a corner
+                if not self.state['goals'][target_obj['index']]['in_corner']:
+                    self.state['robot']['holding_goal'] = True
+                    self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
+                    self.state['goals'][target_obj['index']]['is_held'] = True
+                    reward += 5  # Reward for acquiring mobile goal
+                else:
+                    reward -= 5  # Penalty for trying to pick up a goal in a corner
+            else:
+                reward -= 5  # Penalty for trying to grab another goal
+                
+        elif target_obj['type'] == 'ring':
+            # Ring interaction
+            if self.state['robot']['holding_goal']:
+                goal_index = self.get_held_goal_index()
+                goal = self.state['goals'][goal_index]
+                ring_count = goal['rings_scored']
+                #print(ring_count)
+                if ring_count < 6:  # Goal not full
+                    self.state['rings'][target_obj['index']]['collected'] = True
+                    goal['rings_scored'] += 1
+                    
+                    if ring_count == 0:
+                        reward += 5  # First ring bonus
+                        score += 3
                     else:
-                        reward -= 5  # Penalty for trying to pick up a goal in a corner
+                        reward += 3  # Regular ring score
+                        score += 1
                 else:
-                    reward -= 5  # Penalty for trying to grab another goal
-                    
-            elif target_obj['type'] == 'ring':
-                # Ring interaction
-                if self.state['robot']['holding_goal']:
-                    goal_index = self.get_held_goal_index()
-                    goal = self.state['goals'][goal_index]
-                    ring_count = goal['rings_scored']
-                    
-                    if ring_count < 6:  # Goal not full
-                        self.state['rings'][target_obj['index']]['collected'] = True
-                        goal['rings_scored'] += 1
-                        
-                        if ring_count == 0:
-                            reward += 5  # First ring bonus
-                            score += 3
-                        else:
-                            reward += 3  # Regular ring score
-                            score += 1
-                    else:
-                        reward -= 1  # Penalty for full goal
-                else:
-                    reward -= 0.5  # No goal clamped
-                    
-            elif target_obj['type'] == 'corner':
-                # Corner interaction
-                if self.state['robot']['holding_goal']:
-                    corner_index = target_obj['index']
-                    goal_index = self.get_held_goal_index()
-                    
-                    # Place goal in corner
-                    self.state['robot']['holding_goal'] = False
-                    self.state['corners'][corner_index]['has_goal'] = True
-                    self.state['corners'][corner_index]['goal_index'] = goal_index
-                    
-                    # Update goal position and state
-                    goal = self.state['goals'][goal_index]
-                    goal['position'] = list(self.state['corners'][corner_index]['position'])
-                    goal['is_mobile'] = False
-                    goal['is_held'] = False
-                    goal['in_corner'] = True  # Mark as in a corner
-                    
-                    reward += 8  # Score for placing goal in corner
-                    score += 5
-                else:
-                    reward -= 1  # No goal to place
+                    reward -= 1  # Penalty for full goal
+            else:
+                reward -= 0.5  # No goal clamped
+                
+        elif target_obj['type'] == 'corner':
+            # Corner interaction
+            if self.state['robot']['holding_goal']:
+                corner_index = target_obj['index']
+                goal_index = self.get_held_goal_index()
+                
+                # Place goal in corner
+                self.state['robot']['holding_goal'] = False
+                self.state['corners'][corner_index]['has_goal'] = True
+                self.state['corners'][corner_index]['goal_index'] = goal_index
+                
+                # Update goal position and state
+                goal = self.state['goals'][goal_index]
+                goal['position'] = list(self.state['corners'][corner_index]['position'])
+                goal['is_mobile'] = False
+                goal['is_held'] = False
+                goal['in_corner'] = True  # Mark as in a corner
+                
+                reward += 8  # Score for placing goal in corner
+                score += 5
+            else:
+                reward -= 1  # No goal to place
             
         # Update time
         self.current_time += 1
@@ -377,18 +376,10 @@ class HighStakesEnv(gym.Env):
                 'radius': max(goal['size'][0], goal['size'][1]),  # Use larger dimension
                 'type': 'goal'
             })
-                
-        # Add corners (field corners)
-        field_width = self.state['field']['width']
-        field_height = self.state['field']['height']
-        corner_radius = 1.0  # Assume corners have some radius
-        corners = [
-            {'position': [0, 0], 'radius': corner_radius, 'type': 'corner'},
-            {'position': [field_width, 0], 'radius': corner_radius, 'type': 'corner'},
-            {'position': [0, field_height], 'radius': corner_radius, 'type': 'corner'},
-            {'position': [field_width, field_height], 'radius': corner_radius, 'type': 'corner'}
-        ]
-        all_objects.extend(corners)
+        for obj in all_objects:
+            if obj['position'][0] == end_pos[0] and obj['position'][1] == end_pos[1]:
+                all_objects.remove(obj)
+
         
         # Check collision with each object
         for obj in all_objects:
@@ -463,7 +454,6 @@ class HighStakesEnv(gym.Env):
         
         # Add corners
         for i, corner in enumerate(self.state['corners']):
-            #print(corner['position'], corner['has_goal'])
             if not self.check_collision(robot_pos, corner['position']) and not corner['has_goal']:
                 accessible_objects.append({
                     'position': corner['position'],
@@ -504,7 +494,7 @@ class HighStakesEnv(gym.Env):
     def get_held_goal_index(self):
         """Find the index of the goal being held by the robot"""
         for i, goal in enumerate(self.state['goals']):
-            if not goal['is_mobile'] and self.state['robot']['holding_goal']:
+            if goal['is_held']and self.state['robot']['holding_goal']:
                 return i
         return -1  # Not holding any goal
 
@@ -516,10 +506,12 @@ class DQNAgent:
         self.memory = deque(maxlen=2000)
         self.gamma = 0.95  # discount factor
         self.epsilon = 1.0  # exploration rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.05
+        self.epsilon_decay = 0.95
         self.learning_rate = 0.001
         self.model = self._build_model()
+        # Track previous actions to avoid repetition
+        self.previous_actions = set()
         
     def _build_model(self):
         """Build a neural network model that predicts Q values for each action"""
@@ -541,19 +533,41 @@ class DQNAgent:
     def remember(self, state, action, reward, next_state, done):
         """Store experience in memory"""
         self.memory.append((state, action, reward, next_state, done))
+        # Add action to previous actions set
+        self.previous_actions.add(action)
         
-    def act(self, state, accessible_objects_count):
+    def act(self, state, accessible_objects):
+        k = 'index'
+        #print(accessible_objects)
+        accessiblerange = [d.get(k) for d in accessible_objects if k in d]
+        if(len(accessiblerange) == 0):
+            print("No accessible objects")
+            return None
+        # Filter out actions that have been taken before
+        available_actions = [action for action in accessiblerange if action not in self.previous_actions]
+        
+        # If all actions have been taken before, reset the tracking
+        if not available_actions:
+            #print("All actions have been taken before - resetting tracking")
+            #print(self.previous_actions)
+            self.previous_actions.clear()
+            available_actions = accessiblerange
+            
         """Select action based on epsilon-greedy policy"""
         if np.random.random() <= self.epsilon:
-            return random.randrange(accessible_objects_count)
+            return available_actions[random.randrange(len(available_actions))]
             
         # Reshape state for prediction
         state_tensor = np.array(state).reshape(1, -1).astype(np.float32)
         act_values = self.model.predict(state_tensor, verbose=0)
         
-        # Select best action among accessible ones
-        valid_actions = act_values[0][:accessible_objects_count]
-        return np.argmax(valid_actions)
+        # Select best action among available actions
+        valid_actions = [(i, act_values[0][i]) for i in available_actions]
+        return max(valid_actions, key=lambda x: x[1])[0]
+    
+    def reset(self):
+        """Reset the previous actions tracking when starting a new episode"""
+        self.previous_actions.clear()
         
     def replay(self, batch_size):
         """Train model on batches of experiences"""
@@ -618,6 +632,9 @@ def train_dqn_agent(env, episodes=1000):
     for e in range(episodes):
         # Reset environment for new episode
         env.reset()
+        # Reset agent's action tracking
+        agent.reset()
+        
         state = env.get_observation()
         total_reward = 0
         total_score = 0
@@ -631,8 +648,10 @@ def train_dqn_agent(env, episodes=1000):
                 break
                 
             # Choose action
-            action = agent.act(state, len(accessible_objects))
-            
+            action = agent.act(state, accessible_objects)
+            if action is None:  # No valid actions available
+                break
+                
             # Take action
             next_state, reward, done, _, score = env.step(action)
             next_state = env.get_observation()
