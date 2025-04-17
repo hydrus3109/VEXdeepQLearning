@@ -145,7 +145,8 @@ class HighStakesEnv(gym.Env):
         # Apply time penalty (0.05 points per second)
         time_penalty = movement_time * 0.05
         reward -= time_penalty
-        
+        print(movement_time)
+        self.current_time = self.current_time + movement_time
         # Update robot position and orientation
         target_vector = [
             target_obj['position'][0] - self.state['robot']['position'][0],
@@ -158,7 +159,7 @@ class HighStakesEnv(gym.Env):
         # Handle interaction based on target object type
         if target_obj['type'] == 'goal':
             # Mobile goal interaction
-            if(self.state['goals'][target_obj['index']]['is_scorable']):
+            if(self.state['goals'][target_obj['index']]['scorable']):
                 if not self.state['robot']['holding_goal']:
                     # Only allow picking up a goal if it's not in a corner
                     if not self.state['goals'][target_obj['index']]['in_corner']:
