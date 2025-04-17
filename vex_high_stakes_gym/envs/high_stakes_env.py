@@ -158,17 +158,18 @@ class HighStakesEnv(gym.Env):
         # Handle interaction based on target object type
         if target_obj['type'] == 'goal':
             # Mobile goal interaction
-            if not self.state['robot']['holding_goal']:
-                # Only allow picking up a goal if it's not in a corner
-                if not self.state['goals'][target_obj['index']]['in_corner']:
-                    self.state['robot']['holding_goal'] = True
-                    self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
-                    self.state['goals'][target_obj['index']]['is_held'] = True
-                    reward += 5  # Reward for acquiring mobile goal
+            if(self.state['goals'][target_obj['index']]['is_scorable']):
+                if not self.state['robot']['holding_goal']:
+                    # Only allow picking up a goal if it's not in a corner
+                    if not self.state['goals'][target_obj['index']]['in_corner']:
+                        self.state['robot']['holding_goal'] = True
+                        self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
+                        self.state['goals'][target_obj['index']]['is_held'] = True
+                        reward += 5  # Reward for acquiring mobile goal
+                    else:
+                        reward -= 5  # Penalty for trying to pick up a goal in a corner
                 else:
-                    reward -= 5  # Penalty for trying to pick up a goal in a corner
-            else:
-                reward -= 5  # Penalty for trying to grab another goal
+                    reward -= 5  # Penalty for trying to grab another goal
                 
         elif target_obj['type'] == 'ring':
             # Ring interaction
