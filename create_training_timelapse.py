@@ -39,7 +39,7 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
     agent = DQNAgent(state_size, max_actions)
     
     # Training parameters
-    batch_size = 32
+    batch_size = 16
     
     # Keep track of scores for plotting
     all_scores = []
@@ -64,8 +64,9 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
         done = False
         step_count = 0
         
-        # Determine when to capture frames (evenly throughout the episode)
-        steps_per_frame = env.time_limit // frames_per_episode
+        # Only capture frames for episodes that are multiples of 5
+        capture_this_episode = (e) % 5 == 0
+        frames_to_capture = 30 if capture_this_episode else 0
         frames_this_episode = 0
         
         # Episode loop
@@ -93,8 +94,12 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
             total_score += score
             step_count += 1
             
-            # Capture frame if it's time (or if it's the last frame of the episode)
-            if (step_count % steps_per_frame == 0 or done) and frames_this_episode < frames_per_episode:
+            # Only capture frames if this is a multiple-of-5 episode and we haven't reached our limit
+            if capture_this_episode and frames_this_episode < frames_to_capture:
+                # Clear the figure to ensure we start fresh (fixes stuck pause frame bug)
+                plt.clf()
+                
+                # Render the current state
                 env.render(mode='human')  # Update the plot
                 
                 # Add episode info as text to the frame
@@ -102,13 +107,42 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
                            backgroundcolor='white', alpha=0.7)
                 plt.figtext(0.05, 0.06, f"Epsilon: {agent.epsilon:.2f} (exploration rate)", 
                            backgroundcolor='white', alpha=0.7)
+                plt.figtext(0.05, 0.10, f"Step: {step_count}", 
+                           backgroundcolor='white', alpha=0.7)
                 
                 # Convert plot to image
                 fig = plt.gcf()
                 fig.canvas.draw()
                 frame = np.array(fig.canvas.renderer.buffer_rgba())
+                
+                # Add the frame to our collection
                 frames.append(frame)
+                
+                # Add duplicate frames to create a slight pause between actions (makes video more comprehensible)
+                duplicate_count = 2  # Add 2 duplicate frames for a slight pause
+                for _ in range(duplicate_count):
+                    frames.append(frame.copy())
+                
                 frames_this_episode += 1
+        
+        # Add pause frames between episodes (if we captured frames for this episode)
+        if capture_this_episode and frames_this_episode > 0:
+            # Create a pause frame with episode summary
+            plt.clf()  # Clear the current figure
+            plt.text(0.5, 0.5, f"Episode {e+1} Complete\nTotal Reward: {total_reward:.1f}\nTotal Score: {total_score}",
+                    ha='center', va='center', fontsize=20)
+            plt.axis('off')
+            
+            # Convert pause frame to image
+            fig = plt.gcf()
+            fig.canvas.draw()
+            pause_frame = np.array(fig.canvas.renderer.buffer_rgba())
+            
+            # Add the pause frame 15 times (creates a 1.5-second pause at 10fps)
+            for _ in range(8):
+                frames.append(pause_frame)
+            
+            print(f"Captured {frames_this_episode} frames for episode {e+1}")
         
         # Train the agent after episode completion
         if len(agent.memory) > batch_size:
@@ -119,24 +153,27 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
         all_scores.append(total_score)
         
         # Print progress every 10 episodes
-        if (e + 1) % 10 == 0:
+        if (e ) % 10 == 0:
             avg_reward = np.mean(all_rewards[-10:])
-            print(f"Episode: {e+1}/{episodes}, Avg Reward (last 10): {avg_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
+            print(f"Episode: {e}/{episodes}, Avg Reward (last 10): {avg_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
     
     print("Training complete. Creating video...")
     
     # Create video from frames
-    height, width = frames[0].shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video = cv2.VideoWriter(output_path, fourcc, 8, (width, height))
-    
-    for frame in frames:
-        # Convert RGBA to BGR (OpenCV format)
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-        video.write(frame_bgr)
-    
-    video.release()
-    print(f"Video saved to {output_path}")
+    if frames:
+        height, width = frames[0].shape[:2]
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video = cv2.VideoWriter(output_path, fourcc, 10, (width, height))
+        
+        for frame in frames:
+            # Convert RGBA to BGR (OpenCV format)
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+            video.write(frame_bgr)
+        
+        video.release()
+        print(f"Video saved to {output_path}")
+    else:
+        print("No frames were captured. Check your episode selection criteria.")
     
     # Plot final learning curve
     plt.figure(figsize=(12, 5))
@@ -166,8 +203,8 @@ if __name__ == "__main__":
     # Create timelapse with reasonable defaults
     # You can adjust these parameters as needed
     agent, rewards = create_training_timelapse(
-        episodes=20,# Fewer episodes for quicker demonstration
-        frames_per_episode=3,  # Number of frames to capture in each episode
+        episodes=50,  # Increased to ensure we capture multiple episodes that are multiples of 5
+        frames_per_episode=30,  # This will be overridden for episodes that are multiples of 5
         output_path="training_timelapse.mp4"
     )
     
