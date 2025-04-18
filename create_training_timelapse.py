@@ -9,7 +9,7 @@ import tensorflow as tf
 # Import our environment and agent
 from vex_high_stakes_gym.envs.high_stakes_env import HighStakesEnv, DQNAgent
 
-def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="training_timelapse.mp4"):
+def create_training_timelapse(episodes=10, frames_per_episode=10, output_path="training_timelapse.mp4"):
     """
     Creates a timelapse video of the training progress.
     
@@ -55,6 +55,9 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
     
     for e in tqdm(range(episodes)):
         # Reset environment and agent for new episode
+        render = False
+        if(e % 5 == 0):
+            render = True
         env.reset()
         agent.reset()
         
@@ -63,14 +66,44 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
         total_score = 0
         done = False
         step_count = 0
-        
-        # Determine when to capture frames (evenly throughout the episode)
-        steps_per_frame = env.time_limit // frames_per_episode
+
         frames_this_episode = 0
         
         # Episode loop
         while not done:
-            # Get accessible objects
+            if render:
+            # Capture frame if it's time (or if it's the last frame of the episode)
+                if frames_this_episode < frames_per_episode or done:
+                    env.render(mode='human')  # Update the plot
+                    
+                    # Add episode info as text to the frame
+                    plt.figtext(0.05, 0.02, f"Episode: {e+1}/{episodes}, Reward: {total_reward:.1f}, Score: {total_score}", 
+                            backgroundcolor='white', alpha=0.7)
+                    plt.figtext(0.05, 0.06, f"Epsilon: {agent.epsilon:.2f} (exploration rate)", 
+                            backgroundcolor='white', alpha=0.7)
+                    
+                    # Convert plot to image
+                    fig = plt.gcf()
+                    fig.canvas.draw()
+                    frame = np.array(fig.canvas.renderer.buffer_rgba())
+                    frames.append(frame)
+                    if(frames_this_episode == 0):
+                        # Add a copy of the first frame to ensure we have enough frames
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                    if(frames_this_episode == frames_per_episode - 1):
+                        # Add a copy of the last frame to ensure we have enough frames
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                        frames.append(frame.copy())
+                    frames.append(frame.copy())
+                    frames.append(frame.copy())
+                    frames_this_episode += 1
+                            # Get accessible objects
+
             accessible_objects = env.get_accessible_objects()
             if len(accessible_objects) == 0:
                 break
@@ -92,24 +125,6 @@ def create_training_timelapse(episodes=20, frames_per_episode=10, output_path="t
             total_reward += reward
             total_score += score
             step_count += 1
-            
-            # Capture frame if it's time (or if it's the last frame of the episode)
-            if (step_count % steps_per_frame == 0 or done) and frames_this_episode < frames_per_episode:
-                env.render(mode='human')  # Update the plot
-                
-                # Add episode info as text to the frame
-                plt.figtext(0.05, 0.02, f"Episode: {e+1}/{episodes}, Reward: {total_reward:.1f}, Score: {total_score}", 
-                           backgroundcolor='white', alpha=0.7)
-                plt.figtext(0.05, 0.06, f"Epsilon: {agent.epsilon:.2f} (exploration rate)", 
-                           backgroundcolor='white', alpha=0.7)
-                
-                # Convert plot to image
-                fig = plt.gcf()
-                fig.canvas.draw()
-                frame = np.array(fig.canvas.renderer.buffer_rgba())
-                frames.append(frame)
-                frames_this_episode += 1
-        
         # Train the agent after episode completion
         if len(agent.memory) > batch_size:
             agent.replay(batch_size)
@@ -166,8 +181,8 @@ if __name__ == "__main__":
     # Create timelapse with reasonable defaults
     # You can adjust these parameters as needed
     agent, rewards = create_training_timelapse(
-        episodes=20,# Fewer episodes for quicker demonstration
-        frames_per_episode=3,  # Number of frames to capture in each episode
+        episodes=70,# Fewer episodes for quicker demonstration
+        frames_per_episode=10,  # Number of frames to capture in each episode
         output_path="training_timelapse.mp4"
     )
     

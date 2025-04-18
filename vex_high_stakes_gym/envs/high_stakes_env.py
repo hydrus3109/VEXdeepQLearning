@@ -143,9 +143,9 @@ class HighStakesEnv(gym.Env):
         )
         
         # Apply time penalty (0.05 points per second)
-        time_penalty = movement_time * 0.05
+        time_penalty = movement_time * 0.15
         reward -= time_penalty
-        print(movement_time)
+        #print(movement_time)
         self.current_time = self.current_time + movement_time
         # Update robot position and orientation
         target_vector = [
@@ -166,7 +166,7 @@ class HighStakesEnv(gym.Env):
                         self.state['robot']['holding_goal'] = True
                         self.state['goals'][target_obj['index']]['is_mobile'] = False  # Robot is holding it
                         self.state['goals'][target_obj['index']]['is_held'] = True
-                        reward += 5  # Reward for acquiring mobile goal
+                        reward += 6  # Reward for acquiring mobile goal
                     else:
                         reward -= 5  # Penalty for trying to pick up a goal in a corner
                 else:
@@ -184,10 +184,10 @@ class HighStakesEnv(gym.Env):
                     goal['rings_scored'] += 1
                     
                     if ring_count == 0:
-                        reward += 5  # First ring bonus
+                        reward += 6  # First ring bonus
                         score += 3
                     else:
-                        reward += 3  # Regular ring score
+                        reward += 4  # Regular ring score
                         score += 1
                 else:
                     reward -= 1  # Penalty for full goal
@@ -218,7 +218,7 @@ class HighStakesEnv(gym.Env):
                 reward -= 1  # No goal to place
             
         # Update time
-        self.current_time += 1
+        #self.current_time += 1
         
         # Check if time limit reached
         if self.current_time >= self.time_limit:
@@ -506,11 +506,11 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.95  # discount factor
+        self.gamma = 0.90  # discount factor
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.05
-        self.epsilon_decay = 0.95
-        self.learning_rate = 0.001
+        self.epsilon_decay = 0.98
+        self.learning_rate = 0.0025
         self.model = self._build_model()
         # Track previous actions to avoid repetition
         self.previous_actions = set()
@@ -521,8 +521,10 @@ class DQNAgent:
         import tensorflow as tf
         
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(24, input_dim=self.state_size, activation='relu'),
-            tf.keras.layers.Dense(24, activation='relu'),
+            tf.keras.layers.Dense(128, input_dim=self.state_size, activation='relu'),
+            tf.keras.layers.Dense(256, input_dim = 128, activation='relu'),
+            tf.keras.layers.Dense(256, input_dim = 256, activation='relu'),
+            tf.keras.layers.Dense(128, input_dim = 256, activation='relu'),
             tf.keras.layers.Dense(self.action_size, activation='linear')
         ])
         
