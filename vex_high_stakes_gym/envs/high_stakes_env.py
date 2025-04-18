@@ -145,7 +145,7 @@ class HighStakesEnv(gym.Env):
         # Apply time penalty (0.05 points per second)
         time_penalty = movement_time * 0.05
         reward -= time_penalty
-        #print(movement_time)
+        print(movement_time)
         self.current_time = self.current_time + movement_time
         # Update robot position and orientation
         target_vector = [
@@ -218,7 +218,7 @@ class HighStakesEnv(gym.Env):
                 reward -= 1  # No goal to place
             
         # Update time
-        #self.current_time += 1
+        self.current_time += 1
         
         # Check if time limit reached
         if self.current_time >= self.time_limit:
@@ -506,10 +506,10 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.85  # discount factor
+        self.gamma = 0.95  # discount factor
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.05
-        self.epsilon_decay = 0.98
+        self.epsilon_decay = 0.95
         self.learning_rate = 0.001
         self.model = self._build_model()
         # Track previous actions to avoid repetition
