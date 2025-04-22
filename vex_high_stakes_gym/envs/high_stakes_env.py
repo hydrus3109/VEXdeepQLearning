@@ -146,7 +146,7 @@ class HighStakesEnv(gym.Env):
         time_penalty = movement_time * 0.15
         reward -= time_penalty
         #print(movement_time)
-        self.current_time = self.current_time + movement_time
+        self.current_time = self.current_time + movement_time*0.5
         # Update robot position and orientation
         target_vector = [
             target_obj['position'][0] - self.state['robot']['position'][0],
@@ -473,22 +473,35 @@ class HighStakesEnv(gym.Env):
         robot_orient = self.state['robot']['orientation']
         holding_goal = 1.0 if self.state['robot']['holding_goal'] else 0.0
         
-        # Create a flat observation vector
-        obs = [robot_pos[0], robot_pos[1], robot_orient, holding_goal]
+        # Create a flat observation vector - adding robot type (0)
+        obs = [0.0, robot_pos[0], robot_pos[1], robot_orient, holding_goal]  # 0 = Robot type
         
-        # Add rings information
-        for ring in self.state['rings']:
+        # Add rings information - type 1
+        for i, ring in enumerate(self.state['rings']):
             if not ring['collected']:
-                obs.extend([ring['position'][0], ring['position'][1], 1.0])  # Position + availability flag
+                obs.extend([1.0, float(i), ring['position'][0], ring['position'][1], 1.0])  # 1 = Ring type, then index
             else:
-                obs.extend([0.0, 0.0, 0.0])  # Placeholder for collected rings
+                obs.extend([1.0, float(i), 0.0, 0.0, -1.0])  # Placeholder for collected rings
         
-        # Add goals information
-        for goal in self.state['goals']:
+        # Add goals information - type 2
+        for i, goal in enumerate(self.state['goals']):
             obs.extend([
+                2.0,  # 2 = Goal type
+                float(i),  # Goal index
                 goal['position'][0], goal['position'][1], 
                 float(goal['rings_scored']),
-                1.0 if goal['is_mobile'] else 0.0
+                1.0 if goal['is_mobile'] else 0.0,
+                1.0 if not goal['in_corner'] else 0.0,
+            ])
+            
+        # Add corner information to observation - type 3
+        for i, corner in enumerate(self.state['corners']):
+            obs.extend([
+                3.0,  # 3 = Corner type
+                float(i),  # Corner index
+                corner['position'][0], corner['position'][1],
+                1.0 if corner['has_goal'] else 0.0,
+                float(corner['goal_index']) if corner['has_goal'] else -1.0
             ])
             
         return numpy.array(obs, dtype=numpy.float32)
@@ -505,12 +518,12 @@ class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.memory = deque(maxlen=2000)
-        self.gamma = 0.90  # discount factor
+        self.memory = deque(maxlen=20000)  # Increased memory size for better experience diversity
+        self.gamma = 0.99  # Higher discount factor to value future rewards more
         self.epsilon = 1.0  # exploration rate
-        self.epsilon_min = 0.05
-        self.epsilon_decay = 0.98
-        self.learning_rate = 0.0025
+        self.epsilon_min = 0.01  # Lower minimum for longer exploration
+        self.epsilon_decay = 0.975  # Slower decay for more exploration
+        self.learning_rate = 0.00025  # Lower learning rate for more stable learning
         self.model = self._build_model()
         # Track previous actions to avoid repetition
         self.previous_actions = set()
@@ -521,15 +534,25 @@ class DQNAgent:
         import tensorflow as tf
         
         model = tf.keras.Sequential([
+            # Input layer
             tf.keras.layers.Dense(128, input_dim=self.state_size, activation='relu'),
-            tf.keras.layers.Dense(256, input_dim = 128, activation='relu'),
-            tf.keras.layers.Dense(256, input_dim = 256, activation='relu'),
-            tf.keras.layers.Dense(128, input_dim = 256, activation='relu'),
+            tf.keras.layers.BatchNormalization(),  # Normalize activations for stability
+            
+            # Hidden layers - corrected architecture
+            tf.keras.layers.Dense(512, activation='relu'),
+            tf.keras.layers.Dropout(0.1),  # Add dropout to prevent overfitting
+            
+            tf.keras.layers.Dense(512, activation='relu'),
+            tf.keras.layers.Dropout(0.1),
+            
+            tf.keras.layers.Dense(128, activation='relu'),
+            
+            # Output layer
             tf.keras.layers.Dense(self.action_size, activation='linear')
         ])
         
         model.compile(
-            loss='mse',
+            loss= keras.losses.Huber(),  # Huber loss is more robust to outliers than MSE
             optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
         )
         return model
@@ -630,7 +653,7 @@ def train_dqn_agent(env, episodes=1000):
     agent = DQNAgent(state_size, max_actions)
     
     # Training loop
-    batch_size = 32
+    batch_size = 64  # Increased batch size for more stable gradients
     scores = []
     
     for e in range(episodes):

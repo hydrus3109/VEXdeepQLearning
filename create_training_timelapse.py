@@ -39,7 +39,7 @@ def create_training_timelapse(episodes=10, frames_per_episode=10, output_path="t
     agent = DQNAgent(state_size, max_actions)
     
     # Training parameters
-    batch_size = 32
+    batch_size = 64
     
     # Keep track of scores for plotting
     all_scores = []

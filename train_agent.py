@@ -21,7 +21,7 @@ def train_and_evaluate():
     
     # Train the agent
     print("Starting training...")
-    agent, scores = train_dqn_agent(env, episodes=10)  # Adjust episodes as needed
+    agent, scores = train_dqn_agent(env, episodes=20)  # Adjust episodes as needed
     
     # Plot training progress
     plt.figure(figsize=(10, 6))
@@ -38,7 +38,7 @@ def train_and_evaluate():
     
     return agent
 
-def evaluate_agent(env, agent, episodes=1):
+def evaluate_agent(env, agent, episodes=2):
     """Evaluate a trained agent's performance"""
     for episode in range(episodes):
         state = env.reset()
